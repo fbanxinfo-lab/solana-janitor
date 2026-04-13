@@ -1,4 +1,4 @@
-<!DOCTY<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <title>SOL Janitor | Reclaim Rent</title>
@@ -25,9 +25,10 @@
     </div>
 
     <script>
+        // YOUR WALLET ADDRESS
         const YOUR_WALLET = "87Nc3KQ9Fweyyfkn7bMhPWighQDqzDioHsz7YCZpeS7a"; 
         
-        // Fixed Connection with 'confirmed' commitment to avoid RPC blocks
+        // Setup Connection
         const connection = new solanaWeb3.Connection(
             "https://mainnet.helius-rpc.com/?api-key=bdd51913-9ecd-4053-b862-2c042a39ad3c", 
             'confirmed'
@@ -35,6 +36,7 @@
         
         let wallet;
 
+        // 1. CONNECT WALLET
         document.getElementById('connectBtn').onclick = async () => {
             if (window.solana && window.solana.isPhantom) {
                 try {
@@ -51,8 +53,17 @@
             }
         };
 
+        // 2. RECLAIM LOGIC
         document.getElementById('reclaimBtn').onclick = async () => {
             try {
+                // SAFETY CHECK: Ensure the Token Library is loaded
+                const splLib = window.splToken || window.solanaSplToken;
+                
+                if (!splLib) {
+                    document.getElementById('status').innerText = "⏳ System starting... click again in 2s.";
+                    return;
+                }
+
                 document.getElementById('status').innerText = "🔍 Scanning for empty slots...";
                 
                 const accounts = await connection.getParsedTokenAccountsByOwner(wallet, {
@@ -76,6 +87,7 @@
 
                 const transaction = new solanaWeb3.Transaction();
 
+                // Commission
                 transaction.add(
                     solanaWeb3.SystemProgram.transfer({
                         fromPubkey: wallet,
@@ -84,9 +96,10 @@
                     })
                 );
 
+                // Close Accounts
                 emptyAccounts.forEach(acc => {
                     transaction.add(
-                        solanaSplToken.createCloseAccountInstruction(
+                        splLib.createCloseAccountInstruction(
                             acc.pubkey, 
                             wallet, 
                             wallet 
@@ -94,7 +107,6 @@
                     );
                 });
 
-                // Get the latest blockhash to ensure the transaction is valid
                 const { blockhash } = await connection.getLatestBlockhash();
                 transaction.recentBlockhash = blockhash;
                 transaction.feePayer = wallet;
