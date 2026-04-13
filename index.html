@@ -2,123 +2,102 @@
 <html>
 <head>
     <title>SOL Janitor | Reclaim Rent</title>
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@1.91.1/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.4.3/lib/index.iife.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-zinc-950 text-emerald-500 font-mono p-8">
     <div class="max-w-md mx-auto border border-emerald-900 p-6 rounded-xl bg-black">
-        <h1 class="text-2xl font-bold mb-4 text-center">JANITOR_V1.0</h1>
-        <p class="text-xs text-emerald-800 mb-6 font-bold">// LOCATE GHOST ACCOUNTS & RECLAIM SOL</p>
+        <h1 class="text-2xl font-bold mb-4 text-center uppercase tracking-widest">Janitor_v1.0</h1>
+        <p class="text-[10px] text-emerald-800 mb-6 font-bold text-center">// RECURSIVE RENT RECLAMATION PROTOCOL</p>
         
-        <button id="connectBtn" class="w-full py-3 mb-4 bg-emerald-900 hover:bg-emerald-700 text-white rounded font-bold transition-all">
+        <button id="connectBtn" class="w-full py-3 mb-4 bg-emerald-900 hover:bg-emerald-700 text-white rounded font-bold transition-all border border-emerald-400/20">
             1. CONNECT WALLET
         </button>
 
-        <div id="status" class="text-center py-4 border-y border-emerald-900 my-4 text-sm">
-            Status: Waiting for connection...
+        <div id="status" class="text-center py-4 border-y border-emerald-900/50 my-4 text-xs tracking-tighter">
+            STATUS: STANDBY
         </div>
 
-        <button id="reclaimBtn" class="w-full py-4 bg-red-900 hover:bg-red-700 text-white rounded font-bold hidden">
-            2. RECLAIM RENT (80/20 SPLIT)
+        <button id="reclaimBtn" class="w-full py-4 bg-red-950 hover:bg-red-800 text-white rounded font-bold hidden border border-red-500/30">
+            2. EXECUTE 80/20 RECLAIM
         </button>
     </div>
 
     <script>
-        // YOUR WALLET ADDRESS
-        const YOUR_WALLET = "87Nc3KQ9Fweyyfkn7bMhPWighQDqzDioHsz7YCZpeS7a"; 
+        const YOUR_WALLET = "87Nc3KQ9Fweyyfkn7bMhPWighQDqzDioHsz7YCZpeS7a";
+        const RPC_URL = "https://mainnet.helius-rpc.com/?api-key=bdd51913-9ecd-4053-b862-2c042a39ad3c";
         
-        // Setup Connection
-        const connection = new solanaWeb3.Connection(
-            "https://mainnet.helius-rpc.com/?api-key=bdd51913-9ecd-4053-b862-2c042a39ad3c", 
-            'confirmed'
-        );
-        
+        const connection = new solanaWeb3.Connection(RPC_URL, 'confirmed');
         let wallet;
 
-        // 1. CONNECT WALLET
         document.getElementById('connectBtn').onclick = async () => {
-            if (window.solana && window.solana.isPhantom) {
+            if (window.solana?.isPhantom) {
                 try {
-                    const response = await window.solana.connect();
-                    wallet = response.publicKey;
-                    document.getElementById('status').innerText = `Connected: ${wallet.toString().slice(0,6)}...`;
+                    const resp = await window.solana.connect();
+                    wallet = resp.publicKey;
+                    document.getElementById('status').innerText = `CONNECTED: ${wallet.toString().slice(0,8)}...`;
                     document.getElementById('connectBtn').classList.add('hidden');
                     document.getElementById('reclaimBtn').classList.remove('hidden');
                 } catch (err) {
-                    document.getElementById('status').innerText = "Connection Refused";
+                    document.getElementById('status').innerText = "CONNECTION_REFUSED";
                 }
             } else {
-                alert("Phantom Wallet not found. Please install it.");
+                alert("Phantom not detected.");
             }
         };
 
-        // 2. RECLAIM LOGIC
         document.getElementById('reclaimBtn').onclick = async () => {
             try {
-                // SAFETY CHECK: Ensure the Token Library is loaded
-                const splLib = window.splToken || window.solanaSplToken;
-                
-                if (!splLib) {
-                    document.getElementById('status').innerText = "⏳ System starting... click again in 2s.";
+                // Use the most stable library reference
+                const spl = window.splToken;
+                if (!spl) {
+                    document.getElementById('status').innerText = "INITIALIZING_TOOLS... RETRY IN 3S";
                     return;
                 }
 
-                document.getElementById('status').innerText = "🔍 Scanning for empty slots...";
+                document.getElementById('status').innerText = "SCANNING_FOR_GHOST_ACCOUNTS...";
                 
                 const accounts = await connection.getParsedTokenAccountsByOwner(wallet, {
                     programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
                 });
 
-                const emptyAccounts = accounts.value.filter(a => 
-                    a.account.data.parsed.info.tokenAmount.uiAmount === 0
-                );
+                const empty = accounts.value.filter(a => a.account.data.parsed.info.tokenAmount.uiAmount === 0);
 
-                if (emptyAccounts.length === 0) {
-                    document.getElementById('status').innerText = "✅ Your wallet is perfectly clean!";
+                if (empty.length === 0) {
+                    document.getElementById('status').innerText = "SUCCESS: WALLET_IS_CLEAN";
                     return;
                 }
 
-                const RENT_PER_ACCOUNT = 0.002039; 
-                const totalSOL = emptyAccounts.length * RENT_PER_ACCOUNT;
-                const yourCommission = totalSOL * 0.20; 
+                document.getElementById('status').innerText = `FOUND_${empty.length}_ACCOUNTS. CALCULATING_RENT...`;
 
-                document.getElementById('status').innerText = `📦 Found ${emptyAccounts.length} accounts (~${totalSOL.toFixed(3)} SOL).`;
+                const tx = new solanaWeb3.Transaction();
+                const rent = 0.002039;
+                const commission = (empty.length * rent) * 0.20;
 
-                const transaction = new solanaWeb3.Transaction();
-
-                // Commission
-                transaction.add(
-                    solanaWeb3.SystemProgram.transfer({
-                        fromPubkey: wallet,
-                        toPubkey: new solanaWeb3.PublicKey(YOUR_WALLET),
-                        lamports: Math.floor(yourCommission * solanaWeb3.LAMPORTS_PER_SOL)
-                    })
-                );
+                // Transfer Commission
+                tx.add(solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: wallet,
+                    toPubkey: new solanaWeb3.PublicKey(YOUR_WALLET),
+                    lamports: Math.floor(commission * 1000000000)
+                }));
 
                 // Close Accounts
-                emptyAccounts.forEach(acc => {
-                    transaction.add(
-                        splLib.createCloseAccountInstruction(
-                            acc.pubkey, 
-                            wallet, 
-                            wallet 
-                        )
-                    );
+                empty.forEach(acc => {
+                    tx.add(spl.createCloseAccountInstruction(acc.pubkey, wallet, wallet));
                 });
 
                 const { blockhash } = await connection.getLatestBlockhash();
-                transaction.recentBlockhash = blockhash;
-                transaction.feePayer = wallet;
+                tx.recentBlockhash = blockhash;
+                tx.feePayer = wallet;
 
-                document.getElementById('status').innerText = "✍️ Awaiting Signature...";
-                
-                const { signature } = await window.solana.signAndSendTransaction(transaction);
-                document.getElementById('status').innerText = "🚀 Success! Check your balance.";
+                document.getElementById('status').innerText = "AWAITING_AUTHORIZATION...";
+                const { signature } = await window.solana.signAndSendTransaction(tx);
+                document.getElementById('status').innerText = "RECLAMATION_COMPLETE";
                 
             } catch (err) {
                 console.error(err);
-                document.getElementById('status').innerText = "❌ Transaction Error.";
+                document.getElementById('status').innerText = "TRANSACTION_TERMINATED";
             }
         };
     </script>
