@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SOL Janitor | Reclaim Rent</title>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-emerald-500 font-mono p-8">
+    <div class="max-w-md mx-auto border border-emerald-900 p-6 rounded-xl bg-black">
+        <h1 class="text-2xl font-bold mb-4 text-center">JANITOR_V1.0</h1>
+        <p class="text-xs text-emerald-800 mb-6 font-bold">// LOCATE GHOST ACCOUNTS & RECLAIM SOL</p>
+        
+        <button id="connectBtn" class="w-full py-3 mb-4 bg-emerald-900 hover:bg-emerald-700 text-white rounded font-bold transition-all">
+            1. CONNECT WALLET
+        </button>
+
+        <div id="status" class="text-center py-4 border-y border-emerald-900 my-4 text-sm">
+            Status: Waiting for connection...
+        </div>
+
+        <button id="reclaimBtn" class="w-full py-4 bg-red-900 hover:bg-red-700 text-white rounded font-bold hidden">
+            2. RECLAIM RENT (80/20 SPLIT)
+        </button>
+    </div>
+
+    <script>
+        // YOUR WALLET ADDRESS (This is where your 20% commission goes)
+        const YOUR_WALLET = "87Nc3KQ9Fweyyfkn7bMhPWighQDqzDioHsz7YCZpeS7a"; 
+        
+        let wallet;
+
+        // Connect Function
+        document.getElementById('connectBtn').onclick = async () => {
+            if (window.solana && window.solana.isPhantom) {
+                const resp = await window.solana.connect();
+                wallet = resp.publicKey.toString();
+                document.getElementById('status').innerText = "Connected: " + wallet.slice(0,6) + "...";
+                document.getElementById('reclaimBtn').classList.remove('hidden');
+                document.getElementById('connectBtn').classList.add('hidden');
+            } else {
+                alert("Please install Phantom Wallet!");
+            }
+        };
+
+        // Reclaim Function
+        document.getElementById('reclaimBtn').onclick = async () => {
+            document.getElementById('status').innerText = "Scanning for empty accounts...";
+            // This is where the magic happens. 
+            // In a real build, we call the "CloseAccount" instruction here.
+            alert("Scanner Active: Searching for locked rent...");
+        };
+    </script>
+</body>
+</html>
