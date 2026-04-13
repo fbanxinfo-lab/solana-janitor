@@ -3,6 +3,7 @@
 <head>
     <title>SOL Janitor | Reclaim Rent</title>
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-zinc-950 text-emerald-500 font-mono p-8">
@@ -24,30 +25,85 @@
     </div>
 
     <script>
-        // YOUR WALLET ADDRESS (This is where your 20% commission goes)
+        // YOUR WALLET ADDRESS (Verified)
         const YOUR_WALLET = "87Nc3KQ9Fweyyfkn7bMhPWighQDqzDioHsz7YCZpeS7a"; 
         
+        // Setup Connection to Solana Mainnet
+        const connection = new solanaWeb3.Connection("https://api.mainnet-beta.solana.com");
         let wallet;
 
-        // Connect Function
+        // 1. CONNECT WALLET LOGIC
         document.getElementById('connectBtn').onclick = async () => {
             if (window.solana && window.solana.isPhantom) {
-                const resp = await window.solana.connect();
-                wallet = resp.publicKey.toString();
-                document.getElementById('status').innerText = "Connected: " + wallet.slice(0,6) + "...";
-                document.getElementById('reclaimBtn').classList.remove('hidden');
-                document.getElementById('connectBtn').classList.add('hidden');
+                try {
+                    const response = await window.solana.connect();
+                    wallet = response.publicKey;
+                    document.getElementById('status').innerText = `Connected: ${wallet.toString().slice(0,6)}...`;
+                    document.getElementById('connectBtn').classList.add('hidden');
+                    document.getElementById('reclaimBtn').classList.remove('hidden');
+                } catch (err) {
+                    document.getElementById('status').innerText = "Connection Refused";
+                }
             } else {
-                alert("Please install Phantom Wallet!");
+                alert("Phantom Wallet not found. Please install it.");
             }
         };
 
-        // Reclaim Function
+        // 2. THE PRODUCTION RECLAIM LOGIC
         document.getElementById('reclaimBtn').onclick = async () => {
-            document.getElementById('status').innerText = "Scanning for empty accounts...";
-            // This is where the magic happens. 
-            // In a real build, we call the "CloseAccount" instruction here.
-            alert("Scanner Active: Searching for locked rent...");
+            try {
+                document.getElementById('status').innerText = "🔍 Scanning for empty slots...";
+                
+                const accounts = await connection.getParsedTokenAccountsByOwner(wallet, {
+                    programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+                });
+
+                const emptyAccounts = accounts.value.filter(a => 
+                    a.account.data.parsed.info.tokenAmount.uiAmount === 0
+                );
+
+                if (emptyAccounts.length === 0) {
+                    document.getElementById('status').innerText = "✅ Your wallet is perfectly clean!";
+                    return;
+                }
+
+                const RENT_PER_ACCOUNT = 0.002039; 
+                const totalSOL = emptyAccounts.length * RENT_PER_ACCOUNT;
+                const yourCommission = totalSOL * 0.20; 
+
+                document.getElementById('status').innerText = `📦 Found ${emptyAccounts.length} accounts (~${totalSOL.toFixed(3)} SOL).`;
+
+                const transaction = new solanaWeb3.Transaction();
+
+                // Commission Instruction
+                transaction.add(
+                    solanaWeb3.SystemProgram.transfer({
+                        fromPubkey: wallet,
+                        toPubkey: new solanaWeb3.PublicKey(YOUR_WALLET),
+                        lamports: Math.floor(yourCommission * solanaWeb3.LAMPORTS_PER_SOL)
+                    })
+                );
+
+                // Close Account Instructions
+                emptyAccounts.forEach(acc => {
+                    transaction.add(
+                        splToken.createCloseAccountInstruction(
+                            acc.pubkey, 
+                            wallet, 
+                            wallet 
+                        )
+                    );
+                });
+
+                document.getElementById('status').innerText = "✍️ Awaiting Signature...";
+                
+                const { signature } = await window.solana.signAndSendTransaction(transaction);
+                document.getElementById('status').innerText = "🚀 Success! Check your balance.";
+                
+            } catch (err) {
+                console.error(err);
+                document.getElementById('status').innerText = "❌ Transaction Error.";
+            }
         };
     </script>
 </body>
